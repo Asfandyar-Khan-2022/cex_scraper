@@ -33,7 +33,7 @@ class Crawler:
         self.url = 'https://uk.webuy.com/search?stext=iphone%207%20plus'
         self.phones_names_list = []
         self.phones_price_list = []
-        self.image_url_list = []
+        self.url_list = []
 
     def load_and_accept_cookies(self) -> webdriver.Chrome:
         """
@@ -41,7 +41,7 @@ class Crawler:
         """
         self.url = 'https://uk.webuy.com/search/?stext=iphone%207%20plus'
         self.driver.get(self.url)
-        time.sleep(5)
+        time.sleep(10)
         accept_cookies_button = self.driver.find_element(By.XPATH,
         value='//*[@id="onetrust-accept-btn-handler"]')
         accept_cookies_button.click()
@@ -66,11 +66,24 @@ class Crawler:
         number_of_results_only = int(number_of_results.text.split(' ')[0])
         parent = self.driver.find_elements(By.CSS_SELECTOR, value='a.line-clamp')
         index_of_result = parent[0].get_attribute('href').rfind('1')
-        for i in range(1, number_of_results_only + 1):
-            print(parent[0].get_attribute('href')[:index_of_result] + str(i))
         time.sleep(3)
-        self.driver.back()
-        time.sleep(100)
+        for i in range(1, number_of_results_only + 1):
+            self.url_list.append(parent[0].get_attribute('href')[:index_of_result] + str(i))
+        
+        print(self.url_list)
+
+        # for i in self.url_list:
+        #     self.driver.execute_script("window.open('');") 
+        #     self.driver.switch_to.window(self.driver.window_handles[1]) 
+        #     self.driver.get(i)
+        #     time.sleep(5)
+        #     self.driver.close()
+        #     self.driver.switch_to.window(self.driver.window_handles[0])
+        # time.sleep(5)
+        # print('here')
+        # time.sleep(3)
+        # self.driver.back()
+        # time.sleep(100)
 
 
 if __name__ == '__main__':
