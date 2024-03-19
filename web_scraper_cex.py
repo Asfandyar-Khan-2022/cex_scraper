@@ -56,11 +56,11 @@ class Crawler:
         Do the same for grade b.
         """
         grade_a = self.driver.find_element(By.XPATH,
-        value='//*[@id="__layout"]/div/div[6]/div[2]/div[1]/div/div/div[47]/ul/li[3]')
+        value='//*[@id="main"]/div/div/div[1]/div[2]/div/div[3]/div[1]/div/div[3]/div[46]/div/div/div/ul/li[2]/label/span[1]')
         grade_a.click()
         time.sleep(1)
         grade_b = self.driver.find_element(By.XPATH,
-        value='//*[@id="__layout"]/div/div[6]/div[2]/div[1]/div/div/div[47]/ul/li[2]')
+        value='//*[@id="main"]/div/div/div[1]/div[2]/div/div[3]/div[1]/div/div[3]/div[46]/div/div/div/ul/li[1]/label/span[1]')
         grade_b.click()
 
 
