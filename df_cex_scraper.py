@@ -7,6 +7,7 @@ from selenium.webdriver.common.by import By
 import requests
 from selenium.webdriver.chrome.options import Options
 import re
+import json
 
 chrome_options = Options()
 # chrome_options.add_argument("--headless")
@@ -37,6 +38,7 @@ class Crawler:
         self.url_list = []
         self.spec_list = []
         self.price_list = []
+        self.image_url = ''
 
     def load_and_accept_cookies(self) -> webdriver.Chrome:
         """
@@ -96,6 +98,7 @@ class Crawler:
             self.driver.switch_to.window(self.driver.window_handles[1]) 
             self.driver.get(url)
             time.sleep(10)
+            self.product_image()
             self.product_prices()
             self.product_spec()
             time.sleep(5)
@@ -103,6 +106,7 @@ class Crawler:
             self.driver.switch_to.window(self.driver.window_handles[0])
         time.sleep(5)
         print('DONE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        self.export_json()
 
     def product_spec(self):
         self.spec_list = []
@@ -119,29 +123,41 @@ class Crawler:
             self.price_list.append(price)
         self.price_list = re.findall(r'\d+\.\d+', self.price_list[0])
         self.price_list = [float(num) for num in self.price_list]
-
-
+    
+    def product_image(self):
+        self.image_url = ''
+        image = self.driver.find_element(By.XPATH, '//*[@id="main"]/div/div/div[1]/div[1]/div[1]/div/div[2]/img')
+        self.image_url = image.get_attribute('src')
     
     def phone_name_and_condition(self):
         """
         Find all span tags and classes that correlate with the desired device names.
         """
-        dict_phones = {'Manufacturer': [], 'Phone Model': [], 'Network': [], 'Grade': [], 'Capacity': [], 'Phone Colour': [], 'Main Colour': [], 'OS': [], 'Physical SIM Slots': [], 'Price': [], 'Trade-in for Voucher': [], 'Trade-in for cash': []}
-        dict_phones['Manufacturer'].append(self.spec_list[0])
-        dict_phones['Phone Model'].append(self.spec_list[1])
-        dict_phones['Network'].append(self.spec_list[2])
-        dict_phones['Grade'].append(self.spec_list[3])
-        dict_phones['Capacity'].append(self.spec_list[4])
-        dict_phones['Phone Colour'].append(self.spec_list[5])
-        dict_phones['Main Colour'].append(self.spec_list[6])
-        dict_phones['OS'].append(self.spec_list[7])
-        dict_phones['Physical SIM Slots'].append(self.spec_list[8])
-        dict_phones['Price'].append(self.price_list[0])
-        dict_phones['Trade-in for Voucher'].append(self.price_list[1])
-        dict_phones['Trade-in for cash'].append(self.price_list[2])
-        self.phones_names_list.append(dict_phones)
-
+        dict_phones = {'manufacturer': [], 'phone_model': [], 'network': [],
+                        'grade': [], 'capacity': [], 'phone_colour': [],
+                        'main_colour': [], 'os': [], 'physical_sim_slots': [],
+                        'price': [], 'trade-in_for_voucher': [],
+                        'trade-in _for_cash': [], 'image_url': []}
         
+        dict_phones['manufacturer'].append(self.spec_list[0])
+        dict_phones['phone_model'].append(self.spec_list[1])
+        dict_phones['network'].append(self.spec_list[2])
+        dict_phones['grade'].append(self.spec_list[3])
+        dict_phones['capacity'].append(self.spec_list[4])
+        dict_phones['phone_colour'].append(self.spec_list[5])
+        dict_phones['main_colour'].append(self.spec_list[6])
+        dict_phones['os'].append(self.spec_list[7])
+        dict_phones['physical_sim_slots'].append(self.spec_list[8])
+        dict_phones['price'].append(self.price_list[0])
+        dict_phones['trade-in_for_voucher'].append(self.price_list[1])
+        dict_phones['trade-in _for_cash'].append(self.price_list[2])
+        dict_phones['image_url'].append(self.image_url)
+        self.phones_names_list.append(dict_phones)
+        print(self.phones_names_list)
+
+    def export_json(self):
+        with open('data.json', 'w') as f:
+            json.dump(self.phones_names_list, f)
 
 if __name__ == '__main__':
     start_crawling = Crawler()
