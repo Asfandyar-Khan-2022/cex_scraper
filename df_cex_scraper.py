@@ -6,6 +6,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 import requests
 from selenium.webdriver.chrome.options import Options
+import re
 
 chrome_options = Options()
 # chrome_options.add_argument("--headless")
@@ -29,11 +30,13 @@ class Crawler:
         """
         See help(Crawler) for accurate signature
         """
-        self.driver = driver = webdriver.Chrome(options=chrome_options)
+        self.driver = webdriver.Chrome(options=chrome_options)
         self.url = 'https://uk.webuy.com/search?stext=iphone%207%20plus'
         self.phones_names_list = []
         self.phones_price_list = []
         self.url_list = []
+        self.spec_list = []
+        self.price_list = []
 
     def load_and_accept_cookies(self) -> webdriver.Chrome:
         """
@@ -57,37 +60,92 @@ class Crawler:
         select_iphone.click()
         time.sleep(2)
     
+    def get_all_phone_url(self):
+        # previous_url = ''
+        # while (True):
+        #     if self.driver.current_url != previous_url:
+        #         print(previous_url)
+        #         previous_url = self.driver.current_url
+        #         self.append_all_url_to_list()
+        #         next_page = self.driver.find_element(By.CSS_SELECTOR, '[aria-label="Next"]')
+        #         next_page.click()
+        #         print(self.driver.current_url)
+        #         time.sleep(2)
+        #     else:
+        #         print('HERE')
+        #         break
+
+        self.append_all_url_to_list()
+        next_page = self.driver.find_element(By.CSS_SELECTOR, '[aria-label="Next"]')
+        next_page.click()
+        time.sleep(2)
+    
+    def append_all_url_to_list(self):
+        parent = self.driver.find_elements(By.CSS_SELECTOR, value='a.line-clamp')
+        for i in parent:
+            self.url_list.append(i.get_attribute('href'))
+    
     def go_into_page_and_out(self):
         """
         The option that allows access to the image class is only made available after going into
         a device link and coming back out.
         """
-        number_of_results = self.driver.find_element(By.XPATH, value='//*[@id="main"]/div/div/div[1]/div[2]/div/div[3]/div[2]/div[3]/div[1]/div/div[1]/p')
-        number_of_results_only = int(number_of_results.text.split(' ')[0])
-        parent = self.driver.find_elements(By.CSS_SELECTOR, value='a.line-clamp')
-        index_of_result = parent[0].get_attribute('href').rfind('1')
-        time.sleep(3)
-        for i in range(1, number_of_results_only + 1):
-            self.url_list.append(parent[0].get_attribute('href')[:index_of_result] + str(i))
         
-        print(self.url_list)
+        for url in self.url_list:
+            self.driver.execute_script("window.open('');") 
+            self.driver.switch_to.window(self.driver.window_handles[1]) 
+            self.driver.get(url)
+            time.sleep(10)
+            self.product_prices()
+            self.product_spec()
+            time.sleep(5)
+            self.driver.close()
+            self.driver.switch_to.window(self.driver.window_handles[0])
+        time.sleep(5)
+        print('DONE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
 
-        # for i in self.url_list:
-        #     self.driver.execute_script("window.open('');") 
-        #     self.driver.switch_to.window(self.driver.window_handles[1]) 
-        #     self.driver.get(i)
-        #     time.sleep(5)
-        #     self.driver.close()
-        #     self.driver.switch_to.window(self.driver.window_handles[0])
-        # time.sleep(5)
-        # print('here')
-        # time.sleep(3)
-        # self.driver.back()
-        # time.sleep(100)
+    def product_spec(self):
+        self.spec_list = []
+        product_detail = self.driver.find_elements(By.CSS_SELECTOR, 'span[class="text-sm"]')
+        for i in product_detail:
+            self.spec_list.append(i.text)
+        self.phone_name_and_condition()
+    
+    def product_prices(self):
+        self.price_list = []
+        prices = self.driver.find_elements(By.CSS_SELECTOR, 'div[class="d-flex flex-wrap w-100"]')
+        for i in prices:
+            price = i.text
+            self.price_list.append(price)
+        self.price_list = re.findall(r'\d+\.\d+', self.price_list[0])
+        self.price_list = [float(num) for num in self.price_list]
 
+
+    
+    def phone_name_and_condition(self):
+        """
+        Find all span tags and classes that correlate with the desired device names.
+        """
+        dict_phones = {'Manufacturer': [], 'Phone Model': [], 'Network': [], 'Grade': [], 'Capacity': [], 'Phone Colour': [], 'Main Colour': [], 'OS': [], 'Physical SIM Slots': [], 'Price': [], 'Trade-in for Voucher': [], 'Trade-in for cash': []}
+        dict_phones['Manufacturer'].append(self.spec_list[0])
+        dict_phones['Phone Model'].append(self.spec_list[1])
+        dict_phones['Network'].append(self.spec_list[2])
+        dict_phones['Grade'].append(self.spec_list[3])
+        dict_phones['Capacity'].append(self.spec_list[4])
+        dict_phones['Phone Colour'].append(self.spec_list[5])
+        dict_phones['Main Colour'].append(self.spec_list[6])
+        dict_phones['OS'].append(self.spec_list[7])
+        dict_phones['Physical SIM Slots'].append(self.spec_list[8])
+        dict_phones['Price'].append(self.price_list[0])
+        dict_phones['Trade-in for Voucher'].append(self.price_list[1])
+        dict_phones['Trade-in for cash'].append(self.price_list[2])
+        self.phones_names_list.append(dict_phones)
+
+        
 
 if __name__ == '__main__':
     start_crawling = Crawler()
     start_crawling.load_and_accept_cookies()
     start_crawling.select_iphone()
+    start_crawling.get_all_phone_url()
     start_crawling.go_into_page_and_out()
