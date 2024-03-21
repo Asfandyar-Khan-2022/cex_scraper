@@ -8,9 +8,10 @@ import requests
 from selenium.webdriver.chrome.options import Options
 import re
 import json
+import os
 
 chrome_options = Options()
-# chrome_options.add_argument("--headless")
+chrome_options.add_argument("--headless")
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
 chrome_options.add_argument("--window-size=1920x1080")
@@ -63,24 +64,23 @@ class Crawler:
         time.sleep(2)
     
     def get_all_phone_url(self):
-        # previous_url = ''
-        # while (True):
-        #     if self.driver.current_url != previous_url:
-        #         print(previous_url)
-        #         previous_url = self.driver.current_url
-        #         self.append_all_url_to_list()
-        #         next_page = self.driver.find_element(By.CSS_SELECTOR, '[aria-label="Next"]')
-        #         next_page.click()
-        #         print(self.driver.current_url)
-        #         time.sleep(2)
-        #     else:
-        #         print('HERE')
-        #         break
+        previous_url = ''
+        while (True):
+            if self.driver.current_url != previous_url:
+                print(previous_url)
+                previous_url = self.driver.current_url
+                self.append_all_url_to_list()
+                next_page = self.driver.find_element(By.CSS_SELECTOR, '[aria-label="Next"]')
+                next_page.click()
+                time.sleep(2)
+            else:
+                print('HERE')
+                break
 
-        self.append_all_url_to_list()
-        next_page = self.driver.find_element(By.CSS_SELECTOR, '[aria-label="Next"]')
-        next_page.click()
-        time.sleep(2)
+        # self.append_all_url_to_list()
+        # next_page = self.driver.find_element(By.CSS_SELECTOR, '[aria-label="Next"]')
+        # next_page.click()
+        # time.sleep(2)
     
     def append_all_url_to_list(self):
         parent = self.driver.find_elements(By.CSS_SELECTOR, value='a.line-clamp')
@@ -101,12 +101,12 @@ class Crawler:
             self.product_image()
             self.product_prices()
             self.product_spec()
-            time.sleep(5)
             self.driver.close()
             self.driver.switch_to.window(self.driver.window_handles[0])
         time.sleep(5)
         print('DONE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-        self.export_json()
+        if not os.path.exists('data.json'):
+            self.export_json()
 
     def product_spec(self):
         self.spec_list = []
@@ -133,32 +133,47 @@ class Crawler:
         """
         Find all span tags and classes that correlate with the desired device names.
         """
-        dict_phones = {'manufacturer': [], 'phone_model': [], 'network': [],
-                        'grade': [], 'capacity': [], 'phone_colour': [],
-                        'main_colour': [], 'os': [], 'physical_sim_slots': [],
-                        'price': [], 'trade-in_for_voucher': [],
-                        'trade-in _for_cash': [], 'image_url': []}
-        
-        dict_phones['manufacturer'].append(self.spec_list[0])
-        dict_phones['phone_model'].append(self.spec_list[1])
-        dict_phones['network'].append(self.spec_list[2])
-        dict_phones['grade'].append(self.spec_list[3])
-        dict_phones['capacity'].append(self.spec_list[4])
-        dict_phones['phone_colour'].append(self.spec_list[5])
-        dict_phones['main_colour'].append(self.spec_list[6])
-        dict_phones['os'].append(self.spec_list[7])
-        dict_phones['physical_sim_slots'].append(self.spec_list[8])
-        dict_phones['price'].append(self.price_list[0])
-        dict_phones['trade-in_for_voucher'].append(self.price_list[1])
-        dict_phones['trade-in _for_cash'].append(self.price_list[2])
-        dict_phones['image_url'].append(self.image_url)
-        self.phones_names_list.append(dict_phones)
-        print(self.phones_names_list)
+        if not os.path.exists('data.json'):
+            dict_phones = {'manufacturer': (), 'phone_model': (), 'network': (),
+                            'grade': (), 'capacity': (), 'phone_colour': (),
+                            'main_colour': (), 'os': (), 'physical_sim_slots': (),
+                            'time': [], 'price': [], 'trade-in_for_voucher': [],
+                            'trade-in_for_cash': [], 'image_url': ()}
+            
+            dict_phones['manufacturer'] = self.spec_list[0]
+            dict_phones['phone_model'] = self.spec_list[1]
+            dict_phones['network'] = self.spec_list[2]
+            dict_phones['grade'] = self.spec_list[3]
+            dict_phones['capacity'] = self.spec_list[4]
+            dict_phones['phone_colour'] = self.spec_list[5]
+            dict_phones['main_colour'] = self.spec_list[6]
+            dict_phones['os'] = self.spec_list[7]
+            dict_phones['physical_sim_slots'] = self.spec_list[8]
+            dict_phones['time'].append(str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')))
+            dict_phones['price'].append(self.price_list[0])
+            dict_phones['trade-in_for_voucher'].append(self.price_list[1])
+            dict_phones['trade-in_for_cash'].append(self.price_list[2])
+            dict_phones['image_url'] = self.image_url
+            self.phones_names_list.append(dict_phones)
+        else:
+            with open('data.json', 'r') as f:
+                self.data = json.load(f)
+
+            for single_item in self.data:
+                if all(item in single_item.values() for item in self.spec_list[:9]): # change the square brackets later
+                    print('here')
+                    single_item['price'].append(self.price_list[0])
+                    single_item['trade-in_for_voucher'].append(self.price_list[1])
+                    single_item['trade-in_for_cash'].append(self.price_list[2])
+                    single_item['time'].append(str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')))
+            
+            with open('data.json', 'w') as f:
+                json.dump(self.data, f)
 
     def export_json(self):
         with open('data.json', 'w') as f:
             json.dump(self.phones_names_list, f)
-
+    
 if __name__ == '__main__':
     start_crawling = Crawler()
     start_crawling.load_and_accept_cookies()
