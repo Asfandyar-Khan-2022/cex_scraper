@@ -1,14 +1,14 @@
 """system_module."""
 import datetime
 import time
-import shutil
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-import requests
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+import argparse
 import re
-import json
 import os
+import requests
 
 chrome_options = Options()
 chrome_options.add_argument("--headless")
@@ -17,37 +17,59 @@ chrome_options.add_argument("--disable-dev-shm-usage")
 chrome_options.add_argument("--window-size=1920x1080")
 chrome_options.add_argument("start-maximised")
 
+
 options = webdriver.ChromeOptions()
 options.add_experimental_option('detach', True)
 options.add_experimental_option('excludeSwitches', ['enable-logging'])
 
+parser = argparse.ArgumentParser()
+parser.add_argument("-r", "--Root", help = "Select root link to start crawling from")
+parser.add_argument("-d", "--Docker", help = "Run in container mode")
+
+parser.parse_args()
+args = parser.parse_args()
+if args.Root:
+    print(f'Root link specified as: {args.Root}')
+    crawlLink = args.Root
+else:
+    crawlLink = 'https://uk.webuy.com/search?stext=iphone%207%20plus'
+    print(f'No root link specified, defaulting to: {crawlLink}')
+if args.Docker:
+    print(f'Running in container mode')
+    service = Service(executable_path='/usr/bin/chromedriver')
+
+print("App Started")
 
 class Crawler:
     """
     This class is used to gather Iphone price data.
     """
 
-
     def __init__(self):
         """
         See help(Crawler) for accurate signature
         """
-        self.driver = webdriver.Chrome(options=chrome_options)
-        self.url = 'https://uk.webuy.com/search?stext=iphone%207%20plus'
+        if args.Docker:
+            self.driver = webdriver.Chrome(options=chrome_options, service=service)
+        else:
+            self.driver = webdriver.Chrome(options=chrome_options)
+        self.driver.implicitly_wait(150)
+        self.url = crawlLink
         self.phones_names_list = []
         self.phones_price_list = []
         self.url_list = []
         self.spec_list = []
         self.price_list = []
         self.image_url = ''
+        self.api_get = 'https://buw5pcb475.execute-api.us-east-1.amazonaws.com/production/phone?phoneid='
+        self.api_post = 'https://buw5pcb475.execute-api.us-east-1.amazonaws.com/production/phone'
 
     def load_and_accept_cookies(self) -> webdriver.Chrome:
         """
         Accept the cookies prompt.
         """
-        self.url = 'https://uk.webuy.com/search/?stext=iphone%207%20plus'
+        self.url = crawlLink
         self.driver.get(self.url)
-        time.sleep(10)
         accept_cookies_button = self.driver.find_element(By.XPATH,
         value='//*[@id="onetrust-accept-btn-handler"]')
         accept_cookies_button.click()
@@ -55,8 +77,7 @@ class Crawler:
     
     def select_iphone(self):
         """
-        Find the tick box responsible for grade a and click on it to only show grade a results.
-        Do the same for grade b.
+        Find the tick box responsible for showing only phone results. 
         """
         select_iphone = self.driver.find_element(By.XPATH,
         value='//*[@id="main"]/div/div/div[1]/div[2]/div/div[3]/div[1]/div/div[3]/div[3]/div/div/div/ul/li[1]/label/span[1]')
@@ -97,7 +118,6 @@ class Crawler:
             self.driver.execute_script("window.open('');") 
             self.driver.switch_to.window(self.driver.window_handles[1]) 
             self.driver.get(url)
-            time.sleep(10)
             self.product_image()
             self.product_prices()
             self.product_spec()
@@ -133,13 +153,16 @@ class Crawler:
         """
         Find all span tags and classes that correlate with the desired device names.
         """
-        if not os.path.exists('data.json'):
-            dict_phones = {'manufacturer': (), 'phone_model': (), 'network': (),
+        print(self.api_get + ''.join(string.replace(' ', '').lower() for string in self.spec_list))
+        get_phone = str(self.api_get + ''.join(string.replace(' ', '').lower() for string in self.spec_list))
+        if self.read_from_api(get_phone) == False:
+            dict_phones = {'phoneid': (), 'manufacturer': (), 'phone_model': (), 'network': (),
                             'grade': (), 'capacity': (), 'phone_colour': (),
                             'main_colour': (), 'os': (), 'physical_sim_slots': (),
                             'time': [], 'price': [], 'trade-in_for_voucher': [],
                             'trade-in_for_cash': [], 'image_url': ()}
             
+            dict_phones['phoneid'] = ''.join(string.replace(' ', '').lower() for string in self.spec_list)
             dict_phones['manufacturer'] = self.spec_list[0]
             dict_phones['phone_model'] = self.spec_list[1]
             dict_phones['network'] = self.spec_list[2]
@@ -150,29 +173,55 @@ class Crawler:
             dict_phones['os'] = self.spec_list[7]
             dict_phones['physical_sim_slots'] = self.spec_list[8]
             dict_phones['time'].append(str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')))
-            dict_phones['price'].append(self.price_list[0])
-            dict_phones['trade-in_for_voucher'].append(self.price_list[1])
-            dict_phones['trade-in_for_cash'].append(self.price_list[2])
+            dict_phones['price'].append(str(self.price_list[0]))
+            dict_phones['trade-in_for_voucher'].append(str(self.price_list[1]))
+            dict_phones['trade-in_for_cash'].append(str(self.price_list[2]))
             dict_phones['image_url'] = self.image_url
-            self.phones_names_list.append(dict_phones)
+            replace_quote = str(dict_phones).replace("'", '"')
+            self.make_post_request(self.api_post, replace_quote)
         else:
-            with open('data.json', 'r') as f:
-                self.data = json.load(f)
+            data = self.read_from_api(get_phone)
+            data['price'].append(str(self.price_list[0]))
+            data['trade-in_for_voucher'].append(str(self.price_list[1]))
+            data['trade-in_for_cash'].append(str(self.price_list[2]))
+            data['time'].append(str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')))
+            replace_quote = str(data).replace("'", '"')
+            self.make_post_request(self.api_post, replace_quote)
+    
 
-            for single_item in self.data:
-                if all(item in single_item.values() for item in self.spec_list[:9]): # change the square brackets later
-                    print('here')
-                    single_item['price'].append(self.price_list[0])
-                    single_item['trade-in_for_voucher'].append(self.price_list[1])
-                    single_item['trade-in_for_cash'].append(self.price_list[2])
-                    single_item['time'].append(str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')))
-            
-            with open('data.json', 'w') as f:
-                json.dump(self.data, f)
 
-    def export_json(self):
-        with open('data.json', 'w') as f:
-            json.dump(self.phones_names_list, f)
+    def read_from_api(self, url):
+        try:
+            # Make a GET request to the API
+            response = requests.get(url)
+
+            # Check if the response status code indicates success (2xx)
+            if response.status_code // 100 == 2:
+                # Check if the response content is null
+                if response.content.strip() == b'null':
+                    return False
+                else:
+                    return response.json()
+            else:
+                print("Error: Failed to fetch data from the API. Status code:", response.status_code)
+        except requests.exceptions.RequestException as e:
+            print("Error: Failed to connect to the API:", e)
+    
+    def make_post_request(self, url, data):
+        try:
+            # Make the POST request with the provided data
+            response = requests.post(url, data=data)
+
+            # Check the response status code
+            if response.status_code == 200:
+                print("POST request successful.")
+                return response.json()  # Assuming the response is JSON
+            else:
+                print("POST request failed. Status code:", response.status_code)
+                return None
+        except requests.exceptions.RequestException as e:
+            print("Error: Failed to connect to the API:", e)
+            return None
     
 if __name__ == '__main__':
     start_crawling = Crawler()
